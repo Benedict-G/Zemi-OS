@@ -1,0 +1,9 @@
+vault/master.key
+vault/*.enc
+logs/
+backups/
+venv/
+docker/matrix_data/
+__pycache__/
+*.pyc
+.DS_Store

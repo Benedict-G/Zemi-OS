@@ -1,0 +1,198 @@
+"""
+Zemi Browser Module
+Handles web searches and content extraction
+"""
+
+import asyncio
+import subprocess
+import json
+from datetime import datetime
+
+class BrowserController:
+    def __init__(self):
+        self.container_name = "zemi_browser"
+        print("🌐 Browser controller initialized")
+    
+    async def search_web(self, query, num_results=3):
+        """
+        Perform web search using Brave Search with robust extraction
+        """
+    
+        print(f"🔍 Searching for: {query}")
+    
+        try:
+            search_url = f"https://search.brave.com/search?q={query.replace(' ', '+')}"
+        
+            script = f"""
+            const {{ chromium }} = require('playwright');
+        
+            (async () => {{
+                const browser = await chromium.launch();
+                const page = await browser.newPage();
+                await page.goto('{search_url}');
+                await page.waitForTimeout(3000);  // Give extra time for JS to render
+            
+                const results = await page.evaluate((numResults) => {{
+                    // Try multiple result container selectors (Brave often uses these)
+                    const containerSelectors = [
+                        '[data-type="web"]',        // Brave's older structure
+                        '.web-result',               // Common class
+                        '.result',                   
+                        'div[class*="result"]',       // Fuzzy match
+                        'article',                    
+                        '.snippet',                   
+                        '#results .result'            // Some search engines
+                    ];
+                
+                    let resultElements = [];
+                    for (const sel of containerSelectors) {{
+                        const elems = document.querySelectorAll(sel);
+                        if (elems.length > 0) {{
+                            resultElements = elems;
+                            break;
+                        }}
+                    }}
+                
+                    // If still no results, fallback: look for heading links
+                    if (resultElements.length === 0) {{
+                        const headings = document.querySelectorAll('h3 a, h2 a');
+                        headings.forEach((a) => {{
+                            const container = a.closest('div, section');
+                            if (container) {{
+                                const snippet = container.querySelector('p, .snippet, .description')?.textContent || '';
+                                resultElements.push({{
+                                    querySelector: (sel) => {{
+                                        if (sel === 'h2, h3, .title, a.result-header') return a;
+                                        if (sel === '.snippet, .description, p') return {{ textContent: snippet }};
+                                        return null;
+                                    }}
+                                }});
+                            }}
+                        }});
+                    }}
+                
+                    const items = [];
+                    for (let i = 0; i < Math.min(numResults, resultElements.length); i++) {{
+                        const el = resultElements[i];
+                    
+                    // Try to extract title and link
+                    let titleEl = el.querySelector('h2, h3, .title, a.result-header') || el.querySelector('a');
+                    let title = titleEl ? titleEl.textContent.trim() : '';
+                    let link = titleEl ? titleEl.href : '';
+                    
+                    // If no link in title, look for any link inside the container
+                    if (!link) {{
+                        const anyLink = el.querySelector('a');
+                        if (anyLink) {{
+                            link = anyLink.href;
+                            if (!title) title = anyLink.textContent.trim();
+                        }}
+                    }}
+                    
+                    // Extract snippet
+                    const snippetEl = el.querySelector('.snippet, .description, p');
+                    const snippet = snippetEl ? snippetEl.textContent.trim() : '';
+                    
+                    if (title && link) {{
+                        items.push({{ title, snippet, link }});
+                    }}
+                }}
+                
+                return items;
+            }}, {num_results});
+            
+            await browser.close();
+            console.log(JSON.stringify(results));
+        }})();
+        """
+        
+        result = subprocess.run(
+            ["docker", "exec", "-i", "-e", "NODE_PATH=/usr/lib/node_modules", self.container_name, "node"],
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            results = json.loads(result.stdout)
+            if results:
+                return self._format_results(query, results)
+            else:
+                return f"No results found for: {query} (Brave structure may have changed)"
+        else:
+            return f"❌ Search failed: {result.stderr}"
+            
+    except Exception as e:
+        return f"❌ Browser error: {str(e)}"
+    
+    def _format_results(self, query, results):
+        """Format search results for display"""
+        
+        if not results:
+            return f"No results found for: {query}"
+        
+        response = f"🔍 **Search Results for:** {query}\n\n"
+        
+        for i, result in enumerate(results, 1):
+            response += f"**{i}. {result['title']}**\n"
+            response += f"{result['snippet']}\n"
+            response += f"🔗 {result['link']}\n\n"
+        
+        response += f"_Searched at {datetime.now().strftime('%I:%M %p')}_"
+        
+        return response
+    
+    async def fetch_page_content(self, url):
+        """Fetch and extract main content from a URL"""
+        
+        print(f"📄 Fetching: {url}")
+        
+        script = f"""
+        const {{ chromium }} = require('playwright');
+        
+        (async () => {{
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+            
+            await page.goto('{url}', {{ waitUntil: 'networkidle' }});
+            
+            const content = await page.evaluate(() => {{
+                const unwanted = document.querySelectorAll('script, style, nav, footer, aside, .ad');
+                unwanted.forEach(el => el.remove());
+                
+                const main = document.querySelector('main, article, .content, .post') || document.body;
+                return main.textContent;
+            }});
+            
+            await browser.close();
+            console.log(content);
+        }})();
+        """
+        
+        try:
+            result = subprocess.run(
+                ["docker", "exec", "-i", "-e", "NODE_PATH=/usr/lib/node_modules", self.container_name, "node"],
+                input=script,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                return result.stdout[:2000]
+            else:
+                return "❌ Failed to fetch page"
+                
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+
+# Test
+if __name__ == "__main__":
+    async def test():
+        browser = BrowserController()
+        results = await browser.search_web("Python tutorials", 3)
+        print(results)
+    
+    asyncio.run(test())
