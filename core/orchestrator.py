@@ -91,13 +91,15 @@ class ZemiOrchestrator:
 User command: "{user_input}"
 
 Determine:
-1. action: what type of action (search_web, send_email, read_file, write_file, run_script, chat)
+1. action: what type of action (search_web, send_email, read_file, write_file, create_note, read_note, search_notes, list_notes, daily_note, add_event, list_events, chat)
 2. level: execution level (0=reasoning only, 1=read-only, 2=network actions, 3=system execution)
 3. parameters: any needed parameters as a dict
 4. requires_approval: true if this is a sensitive action
 
-Example response:
-{{"action": "search_web", "level": 2, "parameters": {{"query": "weather today"}}, "requires_approval": true}}
+Example responses:
+{{"action": "create_note", "level": 1, "parameters": {{"title": "Meeting Notes", "content": "", "folder": ""}}}}
+{{"action": "add_event", "level": 2, "parameters": {{"title": "Leave Work", "start": "2026-02-18T15:00:00", "duration_hours": 1}}}}
+{{"action": "search_web", "level": 2, "parameters": {{"query": "weather today"}}}}, "requires_approval": true}}
 
 Respond with JSON only:"""
 
@@ -168,6 +170,18 @@ Respond with JSON only:"""
             return await self._handle_read_file(params)
         elif action == "write_file":
             return await self._handle_write_file(params)
+        elif action in ["create_note", "write_note"]:
+            return await self._handle_create_note(params)
+        elif action in ["read_note", "search_notes", "list_notes"]:
+            return await self._handle_read_note(params)
+        elif action == "daily_note":
+            return await self._handle_daily_note(params)
+        elif action in ["add_event", "create_event", "add_calendar"]:
+            return await self._handle_add_event(params)
+        elif action in ["list_events", "check_calendar"]:
+            return await self._handle_list_events(params)
+        elif action == "run_script":
+            return "⚠️ Script execution not enabled yet"
         else:
             return f"❓ Unknown action: {action}"
 
@@ -265,6 +279,44 @@ What would you like me to help you with?"""
         filepath = params.get('path', '')
         return f"✍️  Writing file: {filepath}\n(File operations coming in next steps)"
     
+    async def _handle_create_note(self, params):
+        from obsidian_handler import create_note
+        title = params.get('title', 'Untitled')
+        content = params.get('content', '')
+        folder = params.get('folder', '')
+        return create_note(title, content, folder)
+
+    async def _handle_read_note(self, params):
+        from obsidian_handler import read_note, search_notes, list_notes
+        if 'title' in params:
+            return read_note(params['title'])
+        elif 'query' in params:
+            return search_notes(params['query'])
+        else:
+            return list_notes()
+
+    async def _handle_daily_note(self, params):
+        from obsidian_handler import daily_note
+        return daily_note()
+
+    async def _handle_add_event(self, params):
+        from calendar_handler import add_event
+        from datetime import datetime, timedelta
+        title = params.get('title', 'New Event')
+        start_str = params.get('start', '')
+        try:
+            start = datetime.fromisoformat(start_str)
+        except:
+            start = datetime.now() + timedelta(days=1)
+            start = start.replace(hour=14, minute=0, second=0, microsecond=0)
+        duration = float(params.get('duration_hours', 1.0))
+        return add_event(title, start, duration)
+
+    async def _handle_list_events(self, params):
+        from calendar_handler import list_events
+        days = int(params.get('days_ahead', 7))
+        return list_events(days)
+
     def _log_action(self, user_id, command, intent, result):
         """Log all actions to audit trail"""
         
