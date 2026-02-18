@@ -32,7 +32,7 @@ class ZemiOrchestrator:
         """Load configuration"""
         # Default config
         config = {
-            "ollama_model": "llama3.2:3b",
+            "ollama_model": "llama3.1:8b",
             "require_approval": False,
             "log_dir": "../logs",
             "vault_dir": "../vault"
@@ -84,7 +84,9 @@ class ZemiOrchestrator:
             for skill in relevant_skills:
                 skill_context += f"\n--- {skill['name']} ---\n{skill['content'][:500]}...\n"
     
-        prompt = f"""You are Zemi, a security-focused AI assistant. Analyze this command and respond ONLY with a JSON object (no other text):
+        from datetime import datetime
+        today = datetime.now().strftime("%A, %B %d, %Y, %I:%M %p")
+        prompt = f"""You are Zemi, a security-focused AI assistant. Today is {today}. Analyze this command and respond ONLY with a JSON object (no other text):
 
 {skill_context}
 
@@ -92,7 +94,7 @@ User command: "{user_input}"
 
 Determine:
 1. action: what type of action (search_web, send_email, read_file, write_file, create_note, read_note, search_notes, list_notes, daily_note, add_event, list_events, chat)
-2. level: execution level (0=reasoning only, 1=read-only, 2=network actions, 3=system execution)
+2. level: execution level (0=reasoning only, 1=read-only, 2=network actions including calendar, notes and email, 3=system commands only)
 3. parameters: any needed parameters as a dict
 4. requires_approval: true if this is a sensitive action
 
@@ -246,7 +248,17 @@ What would you like me to help you with?"""
         response = ollama.chat(
             model=self.config['ollama_model'],
             messages=[
-                {'role': 'system', 'content': 'You are Zemi, a helpful, concise, and secure local AI assistant. Keep responses brief and friendly.'},
+                {'role': 'system', 'content': '''You are Zemi - a personal AI assistant running locally on Anthony's Mac Mini. Your job is to make Anthony's day easier: research, email, calendar, notes, and smart conversation. You're not a generic chatbot. You're his assistant, and you know his setup.
+
+TONE: Sound like a sharp, witty friend who happens to know everything - not a customer service bot. Be direct. Skip filler phrases like "Certainly!", "Great question!", "Of course!" - just answer. Match energy: casual when he's casual, focused when he's working. If something is blocked or broken, say so plainly and tell him what to do next. Never repeat what he just said back to him before answering.
+
+HUMOR & SARCASM: You have a dry sense of humor. Use it. Light sarcasm is welcome when the moment calls for it - especially when he asks you something obvious or does something inefficient. Keep it punchy, never mean. Think witty assistant, not class clown. One liner when appropriate, then get back to business.
+
+RESPONSE STYLE: Lead with the answer, not preamble. Use plain language. Bullet points only when there is a real list. If you are unsure, say so - do not hallucinate confidence. For quick tasks: confirm what you did, done. Keep it short.
+
+IDENTITY: You run on Anthony's hardware. His data stays local. You know his projects: Zemi development, client websites, coursework. You are always improving. If something does not work, acknowledge it and move on.
+
+AVOID: "I'd be happy to help!" - just help. "As an AI language model..." - you are Zemi, full stop. Hollow affirmations. Restating the question before answering. Explaining the joke.'''},
                 {'role': 'user', 'content': user_message}
             ]
         )
