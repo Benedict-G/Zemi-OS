@@ -1,0 +1,16 @@
+version: '3'
+services:
+  nextcloud:
+    image: nextcloud:latest
+    container_name: zemi_nextcloud
+    ports:
+      - "8080:80"
+    volumes:
+      - nextcloud_data:/var/www/html
+    environment:
+      - NEXTCLOUD_ADMIN_USER=zemi
+      - NEXTCLOUD_ADMIN_PASSWORD=zemicloud2026
+    restart: unless-stopped
+
+volumes:
+  nextcloud_data:
