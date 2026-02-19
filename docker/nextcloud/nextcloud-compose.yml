@@ -10,7 +10,7 @@ services:
       - /Users/zemi/ZemiV1/docker/nextcloud/ssl:/etc/ssl/nextcloud
     environment:
       - NEXTCLOUD_ADMIN_USER=zemi
-      - NEXTCLOUD_ADMIN_PASSWORD=zemicloud2026
+      - NEXTCLOUD_ADMIN_PASSWORD_FILE=/run/secrets/nextcloud_password
       - NEXTCLOUD_TRUSTED_DOMAINS=100.111.133.70
     restart: unless-stopped
 

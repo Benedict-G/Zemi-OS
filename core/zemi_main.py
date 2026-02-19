@@ -15,10 +15,17 @@ async def main():
     orchestrator = ZemiOrchestrator()
     
     # Initialize Matrix listener
+    from cryptography.fernet import Fernet
+    with open("vault/master.key", "rb") as kf:
+        _key = kf.read()
+    _f = Fernet(_key)
+    with open("vault/matrix.enc", "rb") as ef:
+        _matrix_password = _f.decrypt(ef.read()).decode()
+
     matrix = MatrixListener(
         homeserver="http://100.111.133.70:8008",
         user_id="@zemi2026:localhost",
-        password="SecurePass2026"
+        password=_matrix_password
     )
     
     # Connect them

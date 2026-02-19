@@ -53,7 +53,7 @@ class ZemiOrchestrator:
         self._last_user_input = user_input
 
         # Step 1: Use Ollama to understand intent
-        intent = await self._analyze_intent(user_input)
+        intent = await self._analyze_intent(user_input, user_id)
         
         print(f"🧠 Intent: {intent['action']}")
         print(f"📊 Execution Level: {intent['level']}")
@@ -72,8 +72,23 @@ class ZemiOrchestrator:
         
         return result
     
-    async def _analyze_intent(self, user_input):
+    async def _analyze_intent(self, user_input, user_id="@benedict:localhost"):
         """Use Ollama to understand what user wants"""
+        # Prompt injection protection
+        ALLOWED_USERS = ["@benedict:localhost"]
+        if user_id not in ALLOWED_USERS:
+            return {"action": "chat", "level": 0, "parameters": {"user_input": "Unauthorized user"}}
+        
+        injection_patterns = [
+            "ignore previous", "ignore all", "system prompt", 
+            "you are now", "pretend you", "forget your", 
+            "new instructions", "admin mode", "developer mode",
+            "jailbreak", "disregard", "override"
+        ]
+        message_lower = user_input.lower()
+        if any(pattern in message_lower for pattern in injection_patterns):
+            return {"action": "chat", "level": 0, "parameters": {"user_input": "nice try"}}
+        
         
         # Find relevant skills for this query
         relevant_skills = self.skills.find_relevant_skills(user_input)
@@ -260,7 +275,7 @@ RESPONSE STYLE: Lead with the answer, not preamble. Use plain language. Bullet p
 
 IDENTITY: You run on Anthony's hardware. His data stays local. You know his projects: Zemi development, client websites, coursework. You are always improving. If something does not work, acknowledge it and move on.
 
-AVOID: "I'd be happy to help!" - just help. "As an AI language model..." - you are Zemi, full stop. Hollow affirmations. Restating the question before answering. Explaining the joke.'''},
+AVOID: Inventing physical details like what is on his desk, what he is drinking, or anything you cannot actually know. AVOID: "I'd be happy to help!" - just help. "As an AI language model..." - you are Zemi, full stop. Hollow affirmations. Restating the question before answering. Explaining the joke.'''},
                 {'role': 'user', 'content': user_message}
             ]
         )
