@@ -5,6 +5,8 @@ Coordinates all subsystems and manages execution flow
 
 import asyncio
 import ollama
+from voice_handler import speak
+VOICE_ENABLED = False  # Default off
 import json
 from datetime import datetime
 from pathlib import Path
@@ -70,6 +72,8 @@ class ZemiOrchestrator:
         # Step 4: Log everything
         self._log_action(user_id, user_input, intent, result)
         
+        if VOICE_ENABLED:
+            speak(str(result))
         return result
     
     async def _analyze_intent(self, user_input, user_id="@benedict:localhost"):
@@ -86,6 +90,11 @@ class ZemiOrchestrator:
             "jailbreak", "disregard", "override"
         ]
         message_lower = user_input.lower()
+        if user_input.lower() in ["voice on", "voice off"]:
+            global VOICE_ENABLED
+            VOICE_ENABLED = user_input.lower() == "voice on"
+            status = "on" if VOICE_ENABLED else "off"
+            return {"action": "chat", "level": 0, "parameters": {"user_input": f"Voice turned {status}"}}
         if any(pattern in message_lower for pattern in injection_patterns):
             return {"action": "chat", "level": 0, "parameters": {"user_input": "nice try"}}
         
@@ -290,6 +299,8 @@ AVOID: Inventing physical details like what is on his desk, what he is drinking,
             return "❓ What would you like me to search for?"
 
         result = await self.browser.search_web(query, num_results=3)
+        if VOICE_ENABLED:
+            speak(str(result))
         return result
     
     async def _handle_email(self, params):
