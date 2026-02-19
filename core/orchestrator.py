@@ -80,7 +80,7 @@ class ZemiOrchestrator:
         """Use Ollama to understand what user wants"""
         # Prompt injection protection
         ALLOWED_USERS = ["@benedict:localhost"]
-        if user_id not in ALLOWED_USERS:
+        if not user_id.endswith(":slack") and user_id not in ALLOWED_USERS:
             return {"action": "chat", "level": 0, "parameters": {"user_input": "Unauthorized user"}}
         
         injection_patterns = [

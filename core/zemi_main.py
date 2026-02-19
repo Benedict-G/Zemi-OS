@@ -1,46 +1,19 @@
-"""
-Zemi Main - Connects Orchestrator + Matrix
-"""
-
 import asyncio
-from orchestrator import ZemiOrchestrator
-from matrix_listener import MatrixListener
+from orchestrator import ZemiOrchestrator as Orchestrator
+from slack_listener import SlackListener
 
 async def main():
-    print("="*60)
-    print("🤖 ZEMI V1 - Starting System")
-    print("="*60)
+    print("🚀 Starting Zemi...")
     
     # Initialize orchestrator
-    orchestrator = ZemiOrchestrator()
+    orchestrator = Orchestrator()
     
-    # Initialize Matrix listener
-    from cryptography.fernet import Fernet
-    with open("vault/master.key", "rb") as kf:
-        _key = kf.read()
-    _f = Fernet(_key)
-    with open("vault/matrix.enc", "rb") as ef:
-        _matrix_password = _f.decrypt(ef.read()).decode()
-
-    matrix = MatrixListener(
-        homeserver="http://100.111.133.70:8008",
-        user_id="@zemi2026:localhost",
-        password=_matrix_password
-    )
+    print("✅ Orchestrator ready")
+    print("✅ Connecting to Slack...")
     
-    # Connect them
-    matrix.set_orchestrator(orchestrator)
-    
-    print("\n✅ All systems initialized")
-    print("📱 Connect via Element app to send commands")
-    print("🔗 Matrix server: http://100.111.133.70:8008")
-    print("\n")
-    
-    # Start listening
-    await matrix.start()
+    # Start Slack listener
+    slack = SlackListener(orchestrator)
+    slack.start()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\n👋 Zemi shutting down...")
+    asyncio.run(main())
