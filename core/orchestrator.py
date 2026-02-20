@@ -107,7 +107,16 @@ class ZemiOrchestrator:
                 result = await self._execute_action(intent)
                 return result
             else:
-                return "No pending action to approve."    
+                return "No pending action to approve."
+
+        # NO - Cancel pending action
+        if user_input.strip().upper() == "NO":
+            if user_id in self.pending_actions:
+                del self.pending_actions[user_id]
+                self._save_pending_actions()
+                return "Action cancelled. Nothing was executed."
+            else:
+                return "No pending action to cancel."
             
         # Store for later use
         self._last_user_input = user_input
