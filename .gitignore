@@ -7,3 +7,19 @@ docker/matrix_data/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Runtime state 
+pending_actions.json 
+zemi_error.log 
+zemi_output.log 
+
+# Local config 
+config.json
+
+# Backup / temp files 
+*.backup 
+*.backup* 
+*.new 
+
+# Patch files
+*.patch

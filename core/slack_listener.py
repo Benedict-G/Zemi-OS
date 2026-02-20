@@ -1,8 +1,14 @@
 import asyncio
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+
 from slack_sdk import WebClient
 from slack_sdk.socket_mode import SocketModeClient
 from slack_sdk.socket_mode.response import SocketModeResponse
 from cryptography.fernet import Fernet
+from slack_memory import log_message, search_memory
 
 def get_token(filename):
     with open(f'/Users/zemi/ZemiV1/vault/master.key', 'rb') as f:
@@ -48,6 +54,14 @@ class SlackListener:
 
             # Send response back to same channel
             self.client.chat_postMessage(channel=channel, text=str(result))
+            # Log to Obsidian memory
+            channel_name = channel
+            try:
+                ch_info = self.client.conversations_info(channel=channel)
+                channel_name = ch_info["channel"]["name"]
+            except:
+                pass
+            log_message(channel_name, user, message, str(result))
 
         except Exception as e:
             print(f"Slack error: {e}")

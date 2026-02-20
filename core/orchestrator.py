@@ -5,6 +5,7 @@ Coordinates all subsystems and manages execution flow
 
 import asyncio
 import ollama
+import time
 from voice_handler import speak
 VOICE_ENABLED = False  # Default off
 import json
@@ -14,13 +15,17 @@ from skill_loader import SkillLoader # Add this
 from browser import BrowserController # Add this
 
 class ZemiOrchestrator:
-    def __init__(self, config_path="config.json"):
+    APPROVAL_TIMEOUT = 300
+    PENDING_FILE = "pending_actions.json"
+    def __init__(self, config_path="/Users/zemi/ZemiV1/config.json"):
         self.config = self._load_config(config_path)
         self.running = False
         self.command_queue = asyncio.Queue()
         self._last_user_input = "" # ADD THIS LINE
         self.skills = SkillLoader()
         self.browser = BrowserController() #Add this        
+        self.pending_actions = {}
+        self._load_pending_actions()
 
         # Execution levels
         self.LEVEL_0_REASONING = 0  # AI thinking only
@@ -45,12 +50,65 @@ class ZemiOrchestrator:
                 config.update(json.load(f))
         
         return config
+     
+    def _load_pending_actions(self):
+        try:
+            if Path(self.PENDING_FILE).exists():
+                with open(self.PENDING_FILE, "r") as f:
+                    self.pending_actions = json.load(f)
+                
+                # Clean expired approvals on startup
+                now = time.time()
+                cleaned = {}
+                for user_id, data in self.pending_actions.items():
+                    if now - data["timestamp"] <= self.APPROVAL_TIMEOUT:
+                        cleaned[user_id] = data
+                    
+                self.pending_actions = cleaned
+            else:
+                self.pending_actions = {}
+        except Exception as e:
+            print(f"Error loading pending actions: {e}")
+            self.pending_actions = {}
     
+    def _save_pending_actions(self):
+        try:
+            with open(self.PENDING_FILE, "w") as f:
+                json.dump(self.pending_actions, f)
+        except Exception as e:
+            print(f"Error saving pending actions: {e}") 
+     
     async def process_command(self, user_input, user_id):
         """Main command processing pipeline"""
         
         print(f"\n📥 Command received from {user_id}: {user_input}")
-        
+         
+        # Slack approval check
+        if user_input.strip().upper() == "YES":
+            print("Pending actions keys:", list (self.pending_actions.keys()))
+            print("Current user_id:", user_id)
+            print("MEMORY STATE:", self.pending_actions)
+
+            if user_id in self.pending_actions:            
+                pending = self.pending_actions.get(user_id)
+                intent = pending["intent"]
+                timestamp = pending["timestamp"]
+                
+                # 5 minute expiration window
+                if time.time() - timestamp > self.APPROVAL_TIMEOUT:
+                    del self.pending_actions[user_id]
+                    self._save_pending_actions()
+                    return "Approval expired. Please reissue the command."
+                
+                # Execute approved action
+                del self.pending_actions[user_id]
+                self._save_pending_actions()
+                 
+                result = await self._execute_action(intent)
+                return result
+            else:
+                return "No pending action to approve."    
+            
         # Store for later use
         self._last_user_input = user_input
 
@@ -62,9 +120,19 @@ class ZemiOrchestrator:
         
         # Step 2: Check if approval needed
         if intent['level'] >= self.LEVEL_2_NETWORK and self.config['require_approval']:
-            approved = await self._request_approval(intent, user_id)
-            if not approved:
-                return "❌ Action cancelled by user"
+            self.pending_actions[user_id] = {
+                "intent": intent,
+                "timestamp": time.time()
+            }
+
+            self._save_pending_actions()
+
+            return (
+                "Approval Required\n\n"
+                f"Action: {intent['action']}\n"
+                f"Parameters: {intent.get('parameters', {})}\n\n"
+                "Reply YES to confirm."
+            )
         
         # Step 3: Execute based on intent
         result = await self._execute_action(intent)
@@ -95,6 +163,7 @@ class ZemiOrchestrator:
             VOICE_ENABLED = user_input.lower() == "voice on"
             status = "on" if VOICE_ENABLED else "off"
             return {"action": "chat", "level": 0, "parameters": {"user_input": f"Voice turned {status}"}}
+        
         if any(pattern in message_lower for pattern in injection_patterns):
             return {"action": "chat", "level": 0, "parameters": {"user_input": "nice try"}}
         
@@ -237,6 +306,34 @@ Respond with JSON only:"""
         return response
 
     async def _handle_chat(self, params):
+        # Check memory first
+        user_input = params.get("user_input", "")
+        print(f"DEBUG chat handler params: {params}")
+        from obsidian_handler import search_notes_by_content
+        if len(user_input.strip()) > 2:
+            matches = [m for m in search_notes_by_content(user_input) if not m["folder"].startswith("Slack")]
+            if matches:
+                if len(matches) == 1:
+                    m = matches[0]
+                    response = "📝 " + m["title"] + "\n\n"
+                    if m.get("excerpt"):
+                        response += m["excerpt"] + "\n"
+                    return response
+                else:
+                    response = "📝 Relevant notes:\n\n"
+                    for i, m in enumerate(matches[:5], 1):
+                        response += str(i) + ". " + m["title"] + " (in " + m["folder"] + ")\n"
+                    return response
+
+
+
+        memory_triggers = ["what did we", "what was decided", "what did i say", "search memory", "recall", "what did we decide"]
+        if any(w in user_input.lower() for w in memory_triggers):
+            from slack_memory import search_memory
+            results = search_memory(user_input)
+            if results and results[0] != "No memory found for that query":
+                return "Here is what I found:\n" + "\n".join(results)
+
         """Handle conversational responses"""
         
         user_message = params.get('user_input', params.get('response',  'Hello'))
@@ -327,13 +424,14 @@ AVOID: Inventing physical details like what is on his desk, what he is drinking,
         return create_note(title, content, folder)
 
     async def _handle_read_note(self, params):
-        from obsidian_handler import read_note, search_notes, list_notes
-        if 'title' in params:
-            return read_note(params['title'])
-        elif 'query' in params:
-            return search_notes(params['query'])
-        else:
-            return list_notes()
+        from slack_memory import enhanced_read_note
+        result = enhanced_read_note(search_term)
+        if result and "not found" not in result.lower():
+            return result
+        return f"No notes found related to '{search_term}'."
+
+        
+
 
     async def _handle_daily_note(self, params):
         from obsidian_handler import daily_note
