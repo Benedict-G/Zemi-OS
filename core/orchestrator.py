@@ -279,6 +279,10 @@ Respond with JSON only:"""
         elif action in ["create_note", "write_note"]:
             return await self._handle_create_note(params)
         elif action in ["read_note", "search_notes", "list_notes"]:
+            memory_triggers = ["what did we", "what was decided", "what did i say", "search memory", "recall", "what did we decide", "did we talk about", "do you remember"]
+            if any(w in self._last_user_input.lower() for w in memory_triggers):
+                params['user_input'] = self._last_user_input
+                return await self._handle_chat(params)
             return await self._handle_read_note(params)
         elif action == "daily_note":
             return await self._handle_daily_note(params)
@@ -318,30 +322,34 @@ Respond with JSON only:"""
         # Check memory first
         user_input = params.get("user_input", "")
         print(f"DEBUG chat handler params: {params}")
+
+        # Check Slack memory FIRST before notes search
+        memory_triggers = ["what did we", "what was decided", "what did i say", "search memory", "recall", "what did we decide", "did we talk about", "do you remember"]
+        if any(w in user_input.lower() for w in memory_triggers):
+            from slack_memory import search_memory
+            results = search_memory(user_input)
+            if results and results[0] != "No memory found for that query":
+                return "Here is what I found:\n" + "\n".join(results)
+            else:
+                return "I searched my memory but could not find anything about that. Try checking the specific channel directly."
+
+        # Then check Obsidian notes
         from obsidian_handler import search_notes_by_content
         if len(user_input.strip()) > 2:
             matches = [m for m in search_notes_by_content(user_input) if not m["folder"].startswith("Slack")]
             if matches:
                 if len(matches) == 1:
                     m = matches[0]
-                    response = "📝 " + m["title"] + "\n\n"
+                    response = "\U0001f4cb " + m["title"] + "\n\n"
                     if m.get("excerpt"):
                         response += m["excerpt"] + "\n"
                     return response
                 else:
-                    response = "📝 Relevant notes:\n\n"
+                    response = "\U0001f4cb Relevant notes:\n\n"
                     for i, m in enumerate(matches[:5], 1):
                         response += str(i) + ". " + m["title"] + " (in " + m["folder"] + ")\n"
                     return response
 
-
-
-        memory_triggers = ["what did we", "what was decided", "what did i say", "search memory", "recall", "what did we decide"]
-        if any(w in user_input.lower() for w in memory_triggers):
-            from slack_memory import search_memory
-            results = search_memory(user_input)
-            if results and results[0] != "No memory found for that query":
-                return "Here is what I found:\n" + "\n".join(results)
 
         """Handle conversational responses"""
         
@@ -434,6 +442,7 @@ AVOID: Inventing physical details like what is on his desk, what he is drinking,
 
     async def _handle_read_note(self, params):
         from slack_memory import enhanced_read_note
+        search_term = params.get("query", params.get("title", self._last_user_input))
         result = enhanced_read_note(search_term)
         if result and "not found" not in result.lower():
             return result
