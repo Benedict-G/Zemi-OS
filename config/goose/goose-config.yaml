@@ -1,0 +1,12 @@
+# Zemi V1.2 - Goose Configuration
+ default:
+   provider: ollama 
+   processor: qwen3:8b 
+   accelerator: qwen3:8b 
+   moderator: synopsis 
+   toolkits: 
+   - name: synopsis
+     requires: {} 
+
+logging:
+  file: /Users/zemi/ZemiV1/logs/goose/goose.log

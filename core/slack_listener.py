@@ -48,7 +48,7 @@ class SlackListener:
             # Process through orchestrator
             loop = asyncio.new_event_loop()
             result = loop.run_until_complete(
-                self.orchestrator.process_command(message, f"@{user}:slack")
+                self.orchestrator.process_command(message, f"@{user}:slack", channel)
             )
             loop.close()
 

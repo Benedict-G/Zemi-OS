@@ -200,7 +200,7 @@ class ZemiOrchestrator:
 User command: "{user_input}"
 
 Determine:
-1. action: what type of action (search_web, send_email, read_file, write_file, create_note, read_note, search_notes, list_notes, daily_note, add_event, list_events, memory_search, chat)
+1. action: what type of action (search_web, send_email, read_file, write_file, create_note, read_note, search_notes, list_notes, daily_note, add_event, list_events, chat)
 2. level: execution level (0=reasoning only, 1=read-only, 2=network actions including calendar, notes and email, 3=system commands only)
 3. parameters: any needed parameters as a dict
 4. requires_approval: true if this is a sensitive action
@@ -274,12 +274,6 @@ Respond with JSON only:"""
         print(f"⚙️  Executing: {action}")
         
         # Route to appropriate handler
-        if action == "memory_search":
-            from slack_memory import search_memory
-            results = search_memory(self._last_user_input)
-            if results and results[0] != "No memory found for that query":
-                return "Here is what I found:\n" + "\n".join(results)
-            return "I searched my memory but could not find anything about that."
         if action == "chat":
             # Make sure we pass the user's original message
             if 'user_input' not in params:
