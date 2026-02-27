@@ -457,6 +457,8 @@ AVOID: Inventing physical details like what is on his desk, what he is drinking,
         title = params.get('title', 'Untitled')
         content = params.get('content', '')
         folder = params.get('folder', '')
+        # Normalize folder name - remove word "folder" and strip whitespace
+        folder = folder.replace('Folder', '').replace('folder', '').strip()
         return create_note(title, content, folder)
 
     async def _handle_read_note(self, params):
