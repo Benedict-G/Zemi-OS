@@ -57,8 +57,22 @@ def enhanced_read_note(query):
 def search_memory(query):
     ensure_dirs()
     results = []
-    query_lower = query.lower()
     
+    # Strip common filler phrases to extract keywords
+    filler = [
+        "what do we decide about", "what did we discuss about",
+        "what did we talk about", "do you remember", "recall",
+        "search memory for", "what was decided about",
+        "what did we", "search memory"
+    ]
+    keywords = query.lower()
+    for phrase in filler:
+        keywords = keywords.replace(phrase, "")
+    keywords = [w.strip() for w in keywords.split() if len(w.strip()) > 2]
+
+    if not keywords:
+        return ["No memory found for that query"]
+        
     # Search Slack memory
     if os.path.exists(MEMORY_PATH):
         for channel in os.listdir(MEMORY_PATH):
@@ -70,9 +84,9 @@ def search_memory(query):
                         try:
                             with open(filepath, 'r') as f:
                                 content = f.read()
-                            if query_lower in content.lower():
+                            if any(kw in content.lower() for kw in keywords):
                                 # Find the relevant section
-                                pos = content.lower().find(query_lower)
+                                pos = content.lower().find(keywords[0])
                                 start = max(0, pos - 100)
                                 end = min(len(content), pos + 200)
                                 excerpt = content[start:end]
@@ -85,7 +99,7 @@ def search_memory(query):
                             print(f"Error reading {filepath}: {e}")
     
     # Also search main vault notes
-    vault_results = search_notes_by_content(query)
+    vault_results = search_notes_by_content(" ".join(keywords))
     for match in vault_results[:2]:  # Add top 2 vault results
         folder_info = f" in {match['folder']}" if match['folder'] != 'root' else ""
         excerpt = match.get('excerpt', match.get('content', '')[:100])
