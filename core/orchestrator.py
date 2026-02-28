@@ -201,7 +201,7 @@ User command: "{user_input}"
 
 Determine:
 1. action: what type of action (search_web, send_email, read_file, write_file, create_note, read_note, search_notes, list_notes, daily_note, add_event, list_events, memory_search, chat)
-2. level: execution level (0=reasoning only, 1=read-only, 2=network actions including calendar, notes and email, 3=system commands only)
+2. level: execution level (0=reasoning only, 1=read-only including list_events and check_calendar, 2=network actions including add_event, send_email, 3=system commands only)
 3. parameters: any needed parameters as a dict
 4. requires_approval: true if this is a sensitive action
 
@@ -210,6 +210,7 @@ Example responses:
 {{"action": "chat", "level": 0, "parameters": {{"user_input": "how are you"}}}}
 {{"action": "create_note", "level": 1, "parameters": {{"title": "Meeting Notes", "content": "", "folder": ""}}}}
 {{"action": "add_event", "level": 2, "parameters": {{"title": "Leave Work", "start": "2026-02-18T15:00:00", "duration_hours": 1}}}}
+{{"action": "list_events", "level": 1, "parameters": {{"date": "2026-02-28"}}}}
 {{"action": "search_web", "level": 2, "parameters": {{"query": "weather today"}}}}, "requires_approval": true}}
 
 Respond with JSON only:"""
@@ -491,8 +492,9 @@ AVOID: Inventing physical details like what is on his desk, what he is drinking,
 
     async def _handle_list_events(self, params):
         from calendar_handler import list_events
-        days = int(params.get('days_ahead', 7))
-        return list_events(days)
+        days = params.get('days_ahead', 7)
+        date = params.get('date', None)
+        return list_events(days_ahead=days, date=date)
 
     def _log_action(self, user_id, command, intent, result):
         """Log all actions to audit trail"""
