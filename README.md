@@ -107,3 +107,9 @@ All endpoints authenticated and logged.
 ## Status
 
 Active development project focused on secure AI execution control systems and local-first infrastructure design.
+
+## Architecture Case Study
+
+A detailed breakdown of architectural decisions, security model, and system design tradeoffs is available here:
+
+[Read the Full Architecture Case Study](docs/ARCHITECTURE_CASE_STUDY.md)
