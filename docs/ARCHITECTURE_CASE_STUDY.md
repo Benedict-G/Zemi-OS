@@ -51,6 +51,123 @@ Zemi was built around the following principles:
 5. Clear separation of execution layers  
 6. Observable and auditable system behavior  
 
+---
+
+## 4. System Architecture Overview
+
+Zemi is structured as a layered execution system. Each layer has clearly defined responsibilities and cannot bypass the deterministic routing core.
+
+### Layer 1 — Core OS Layer
+Responsible for execution control and enforcement.
+
+Components:
+- DeterministicRouter
+- ApprovalEngine (FIFO queue with expiration)
+- TrustTierEnforcer
+- FileOperationManager (vault-bound)
+- RateLimiter
+- SafeModeController
+- KillSwitchController
+- ModelFallbackManager
+
+All actions must pass through the DeterministicRouter before execution.
+
+---
+
+### Layer 2 — Intelligence Layer
+Responsible for structured interpretation and model interaction.
+
+Components:
+- IntentAnalyzer
+- Model routing (primary + fallback via Ollama)
+- ChunkedFileProcessor
+- Structured task system (YAML + Markdown driven)
+
+Importantly, intelligence does not execute actions directly.
+It produces structured instructions that must be validated and routed.
+
+---
+
+### Layer 3 — Interaction Layer
+Handles external interfaces.
+
+- Slack integration (Socket Mode)
+- Local voice interface (Whisper STT / Piper TTS)
+
+All inputs from this layer are routed through the DeterministicRouter before any system-level action occurs.
+
+---
+
+### Layer 4 — Skills Subsystem
+Implements modular capability expansion.
+
+Each skill:
+- Declares permissions in a manifest
+- Runs within defined boundaries
+- Cannot directly access the filesystem
+- Is hash-verified on load
+- Can be auto-disabled if integrity checks fail
+
+Skills cannot chain execution outside router control.
+
+---
+
+### Layer 5 — Admin Dashboard
+A separate FastAPI process providing:
+
+- Approval queue visibility
+- Skill lifecycle management
+- Model configuration
+- Safe Mode & Kill Switch controls
+- Structured system logs
+
+The dashboard does not bypass routing logic.
+
+---
+
+## 5. Core Architectural Decisions
+
+### Deterministic Routing Before LLM Reasoning
+
+LLMs generate structured intent.  
+They do not execute.
+
+This prevents probabilistic reasoning from directly triggering system changes.
+
+---
+
+### Mandatory Approval for Destructive Actions
+
+Any action involving:
+- File deletion
+- File overwrite
+- Skill installation
+- System modification
+
+Requires explicit approval before execution.
+
+Approvals expire automatically if not confirmed.
+
+---
+
+### Zero-Trust Skill Model
+
+Skills must declare required permissions.
+Permissions are enforced by the router.
+No skill can elevate privileges dynamically.
+
+---
+
+### Local-Only Inference
+
+All AI inference runs locally via Ollama.
+No required cloud API dependencies exist.
+
+This reduces:
+- External data exposure
+- Token leakage risk
+- Network-based attack surface
+
 Non-Goals:
 
 - Fully autonomous AI agent behavior  
