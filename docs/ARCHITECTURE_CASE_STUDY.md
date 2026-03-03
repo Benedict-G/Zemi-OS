@@ -49,7 +49,16 @@ Zemi was built around the following principles:
 3. Zero-trust skill architecture  
 4. Local-first infrastructure  
 5. Clear separation of execution layers  
-6. Observable and auditable system behavior  
+6. Observable and auditable system behavior
+
+Non-Goals:
+
+- Fully autonomous AI agent behavior  
+- Cloud-dependent architecture  
+- Self-modifying system logic  
+- Automatic privilege escalation  
+
+The project prioritizes execution control over convenience.
 
 ---
 
@@ -168,11 +177,82 @@ This reduces:
 - Token leakage risk
 - Network-based attack surface
 
-Non-Goals:
+---
 
-- Fully autonomous AI agent behavior  
-- Cloud-dependent architecture  
-- Self-modifying system logic  
-- Automatic privilege escalation  
+## 6. Security Model
 
-The project prioritizes execution control over convenience.
+Security in Zemi is enforced through layered constraints rather than trust in model behavior.
+
+### Credential Protection
+- AES-256 encryption via Fernet
+- Encrypted vault storage
+- No plaintext credential persistence
+- No secrets committed to version control
+
+### Trust Tier Enforcement
+Operations are categorized into tiers:
+
+Tier 0 — Read-only operations  
+Tier 1 — Non-destructive modifications  
+Tier 2 — Sensitive operations (require approval)  
+Tier 3 — Critical/destructive operations (strict approval required)
+
+The TrustTierEnforcer prevents unauthorized escalation.
+
+---
+
+### Execution Controls
+- Router-controlled chaining only
+- No direct skill-to-skill execution
+- No self-modifying system logic
+- Kill Switch immediately halts execution
+- Safe Mode disables all destructive operations
+
+All routed actions are logged for auditability.
+
+---
+
+## 7. Tradeoffs & Constraints
+
+Designing for deterministic control introduces tradeoffs.
+
+### Reduced Autonomy
+The system intentionally limits LLM-driven automation in favor of safety.
+
+### Increased Complexity
+Layer separation and approval gating increase architectural overhead.
+
+### Slower Execution Flow
+Approval queues and validation steps add latency compared to autonomous agents.
+
+These tradeoffs were accepted to prioritize security and predictability over speed.
+
+---
+
+## 8. Lessons Learned
+
+### Determinism Simplifies Debugging
+Routing all actions through a single execution path significantly improves traceability.
+
+### Explicit Permission Models Prevent Drift
+Manifest-declared permissions reduce scope creep and accidental privilege escalation.
+
+### Safety Constraints Improve Architecture Discipline
+Designing around “must not” constraints resulted in clearer separation of concerns.
+
+### Observability Is Critical
+Structured logging is essential for understanding AI-driven systems in production-like environments.
+
+---
+
+## 9. Future Evolution
+
+Potential areas of expansion include:
+
+- Role-based access controls (RBAC)
+- Multi-user isolation
+- External API abstraction layer (optional)
+- Advanced telemetry dashboards
+- Production-ready container orchestration
+
+Future iterations would maintain the core philosophy of deterministic routing and explicit approval gating.
