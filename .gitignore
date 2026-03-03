@@ -23,3 +23,5 @@ config.json
 
 # Patch files
 *.patch
+
+.env
